@@ -1,5 +1,6 @@
 #pragma once
 #include <stdint.h>
+
 #include "ssd1306.h"
 
 /* 帧缓冲（外部可读，由 robo_eyes 填写后调用 ssd1306_flush） */

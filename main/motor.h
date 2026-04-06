@@ -1,9 +1,9 @@
 #pragma once
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 typedef enum {
-    MOTOR_STOP  = 0,
+    MOTOR_STOP = 0,
     MOTOR_FWD,
     MOTOR_BWD,
     MOTOR_LEFT,

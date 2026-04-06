@@ -9,4 +9,4 @@
 void ssd1306_init(void);
 
 /* 将 1024 字节帧缓冲一次性推送到显示屏 */
-void ssd1306_flush(const uint8_t *buf);
+void ssd1306_flush(const uint8_t* buf);
