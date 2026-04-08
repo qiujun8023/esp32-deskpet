@@ -18,14 +18,13 @@
 #include "nvs_flash.h"
 #include "robot_state.h"
 
-#define WIFI_SSID    "桌面机器人"
+#define WIFI_SSID    "ESP32-DeskPet"
 #define WIFI_CHAN    6
 #define WIFI_MAX_STA 4
 
 static const char*    TAG      = "wifi_ws";
 static httpd_handle_t s_server = NULL;
 
-/* ---- 内嵌控制网页（HTML + CSS + JS，虚拟摇杆 + 情绪/模式按钮）---- */
 static const char s_html[] =
     "<!DOCTYPE html><html lang='zh-CN'>"
     "<head><meta charset='UTF-8'>"
@@ -158,20 +157,16 @@ static const char s_html[] =
     "}"
     "</script></body></html>";
 
-/* ---- 命令解析（WebSocket 帧 payload）---- */
+// 协议格式：{"j":[x,y]}  {"m":"off|soft|normal"}  {"e":"default|happy|angry|tired"}
+// 差速驱动：jy<0 上推(前进)，jy>0 下推(后退)
+// left = -jy + jx，right = -jy - jx，结果归一化到 [-1,1] 再映射 [-255,255]
 static void parse_cmd(const char* data) {
-    /* 简单 JSON 解析，不引入外部库 */
-    /* 格式：{"j":[x,y]}  {"m":"off|soft|normal"}
-     * {"e":"default|happy|angry|tired"} */
-
     if (strstr(data, "\"j\"")) {
         float       jx = 0, jy = 0;
         const char* bracket = strstr(data, ":[");
         if (bracket) sscanf(bracket + 2, "%f,%f", &jx, &jy);
 
-        /* 死区：摇杆归中时停车 */
-        float mag = jx * jx + jy * jy;
-        if (mag < 0.02f) { /* 约 0.14 半径内视为归中 */
+        if (jx * jx + jy * jy < 0.02f) {  // 死区约 0.14 半径
             g_manual_lock = false;
             motor_set(0, 0);
             return;
@@ -179,16 +174,8 @@ static void parse_cmd(const char* data) {
 
         g_manual_lock = true;
 
-        /* 差速驱动公式：
-         *   jy < 0 = 上推（前进），jy > 0 = 下推（后退）
-         *   left  = -jy + jx   右轮快 → 右转
-         *   right = -jy - jx
-         * 结果范围 [-1, 1]，映射到 [-255, 255]
-         */
-        float fl = -jy + jx;
-        float fr = -jy - jx;
-
-        /* 归一化：当斜推时两路之和超过 1，等比缩小保持方向正确 */
+        float fl   = -jy + jx;
+        float fr   = -jy - jx;
         float maxv = fl < 0 ? -fl : fl;
         if ((fr < 0 ? -fr : fr) > maxv) maxv = fr < 0 ? -fr : fr;
         if (maxv > 1.0f) {
@@ -223,7 +210,6 @@ static void parse_cmd(const char* data) {
     }
 }
 
-/* ---- HTTP/WebSocket 处理器 ---- */
 static esp_err_t handle_root(httpd_req_t* req) {
     httpd_resp_set_type(req, "text/html; charset=utf-8");
     httpd_resp_send(req, s_html, HTTPD_RESP_USE_STRLEN);
@@ -251,16 +237,11 @@ static esp_err_t handle_ws(httpd_req_t* req) {
 }
 
 static esp_err_t handle_redirect(httpd_req_t* req) {
-    /* captive portal 检测路径统一返回主页（200 OK + 内容）：
-     *   Android / 小米 / 华为：非 204 即触发登录弹窗
-     *   iOS / macOS：非 "Success" 即触发登录弹窗
-     */
     httpd_resp_set_type(req, "text/html; charset=utf-8");
     httpd_resp_send(req, s_html, HTTPD_RESP_USE_STRLEN);
     return ESP_OK;
 }
 
-/* ---- captive portal DNS 任务（将所有域名解析到 10.10.10.10）---- */
 static void dns_captive_task(void* arg) {
     (void)arg;
 
@@ -290,38 +271,36 @@ static void dns_captive_task(void* arg) {
         int n = recvfrom(sock, buf, sizeof(buf), 0, (struct sockaddr*)&client, &clen);
         if (n < 12) continue;
 
-        /* 构造 DNS 应答：将所有查询回答为 10.10.10.10 */
+        // Answer: 名称指针 → type A → class IN → TTL 60 → 10.10.10.10
         uint8_t resp[512];
         memcpy(resp, buf, n);
         resp[2] = 0x81;
-        resp[3] = 0x80; /* QR=1, AA=1, RCODE=0 */
+        resp[3] = 0x80;  // QR=1 AA=1 RCODE=0
         resp[6] = 0x00;
-        resp[7] = 0x01; /* ANCOUNT=1 */
+        resp[7] = 0x01;  // ANCOUNT=1
 
-        /* Answer 段：名称指针 → Question，type A，TTL 60，IP */
         int pos     = n;
         resp[pos++] = 0xC0;
-        resp[pos++] = 0x0C; /* 名称指针 */
+        resp[pos++] = 0x0C;
         resp[pos++] = 0x00;
-        resp[pos++] = 0x01; /* type A */
+        resp[pos++] = 0x01;
         resp[pos++] = 0x00;
-        resp[pos++] = 0x01; /* class IN */
+        resp[pos++] = 0x01;
         resp[pos++] = 0x00;
         resp[pos++] = 0x00;
         resp[pos++] = 0x00;
-        resp[pos++] = 60; /* TTL=60 */
+        resp[pos++] = 60;
         resp[pos++] = 0x00;
-        resp[pos++] = 0x04; /* RDLENGTH=4 */
+        resp[pos++] = 0x04;
         resp[pos++] = 10;
         resp[pos++] = 10;
         resp[pos++] = 10;
-        resp[pos++] = 10; /* 10.10.10.10 */
+        resp[pos++] = 10;
 
         sendto(sock, resp, pos, 0, (struct sockaddr*)&client, clen);
     }
 }
 
-/* ---- WiFi AP 事件处理 ---- */
 static void wifi_ap_event_handler(void* arg, esp_event_base_t base, int32_t id, void* data) {
     (void)arg;
     (void)base;
@@ -336,32 +315,26 @@ static void wifi_ap_event_handler(void* arg, esp_event_base_t base, int32_t id, 
     }
 }
 
-/* ---- 初始化入口 ---- */
 void wifi_ws_init(void) {
-    /* NVS 初始化 */
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
         nvs_flash_erase();
         nvs_flash_init();
     }
 
-    /* 初始化顺序：netif → event_loop → wifi_init → create_ap_netif */
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
+
+    esp_netif_t* ap_netif = esp_netif_create_default_wifi_ap();
 
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
 
-    /* 注册 AP 连接/断开事件 */
     ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT, WIFI_EVENT_AP_STACONNECTED, &wifi_ap_event_handler,
                                                         NULL, NULL));
     ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT, WIFI_EVENT_AP_STADISCONNECTED,
                                                         &wifi_ap_event_handler, NULL, NULL));
 
-    /* create_default_wifi_ap 必须在 esp_wifi_init 之后调用 */
-    esp_netif_t* ap_netif = esp_netif_create_default_wifi_ap();
-
-    /* WiFi AP 配置 */
     wifi_config_t ap_cfg = {
         .ap =
             {
@@ -377,11 +350,9 @@ void wifi_ws_init(void) {
 
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &ap_cfg));
-
-    /* 固定 HT20，避免 HT40 带宽协商时信道来回切换导致连接失败 */
+    // HT20 避免 HT40 信道协商导致连接失败
     ESP_ERROR_CHECK(esp_wifi_set_bandwidth(WIFI_IF_AP, WIFI_BW_HT20));
-
-    /* 手动设置国家码，避免 AUTO 策略动态降低发射功率 */
+    // 手动设置国家码，避免 AUTO 策略动态降低发射功率
     wifi_country_t country = {
         .cc     = "CN",
         .schan  = 1,
@@ -392,10 +363,7 @@ void wifi_ws_init(void) {
 
     ESP_ERROR_CHECK(esp_wifi_start());
 
-    /* IP/DHCP 配置必须在 esp_wifi_start() 之后：
-     * start() 触发 WIFI_EVENT_AP_START，内部默认处理器会重置 DHCP 服务器，
-     * 在此之后再配置才不会被覆盖。
-     */
+    // IP/DHCP 必须在 esp_wifi_start() 之后配置，否则会被内部默认处理器覆盖
     ESP_ERROR_CHECK(esp_netif_dhcps_stop(ap_netif));
 
     esp_netif_ip_info_t ip_info = {
@@ -412,14 +380,11 @@ void wifi_ws_init(void) {
     ESP_ERROR_CHECK(esp_netif_set_dns_info(ap_netif, ESP_NETIF_DNS_MAIN, &dns_info));
 
     ESP_ERROR_CHECK(esp_netif_dhcps_start(ap_netif));
-
-    /* 关闭省电模式，确保 beacon 正常发出；设置最大发射功率 */
     ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
     ESP_ERROR_CHECK(esp_wifi_set_max_tx_power(78));
 
     ESP_LOGI(TAG, "wifi ap started: ssid='%s', channel=%d, ip=10.10.10.10", WIFI_SSID, WIFI_CHAN);
 
-    /* HTTP 服务器，启用通配符匹配让所有未知路径走 captive portal 处理 */
     httpd_config_t hcfg   = HTTPD_DEFAULT_CONFIG();
     hcfg.lru_purge_enable = true;
     hcfg.max_uri_handlers = 8;
@@ -437,7 +402,6 @@ void wifi_ws_init(void) {
         .handler      = handle_ws,
         .is_websocket = true,
     };
-    /* 通配符路由：未匹配路径一律返回主页，触发 captive portal 弹窗 */
     static const httpd_uri_t uri_catch = {
         .uri     = "/*",
         .method  = HTTP_GET,
@@ -447,7 +411,6 @@ void wifi_ws_init(void) {
     httpd_register_uri_handler(s_server, &uri_ws);
     httpd_register_uri_handler(s_server, &uri_catch);
 
-    /* DNS captive portal 任务 */
     xTaskCreate(dns_captive_task, "dns_captive", 3072, NULL, 4, NULL);
 
     ESP_LOGI(TAG, "http server started");
