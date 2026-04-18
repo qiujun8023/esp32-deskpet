@@ -1,0 +1,22 @@
+menu "DeskPet Configuration"
+
+    config ESP_WIFI_SSID
+        string "SoftAP SSID"
+        default "ESP32-DeskPet"
+        help
+            WiFi SSID used for the softAP.
+
+    config ESP_WIFI_PASSWORD
+        string "SoftAP Password"
+        default ""
+        help
+            WiFi password for WPA2-PSK. Leave empty for open network.
+
+    config ESP_MAX_STA_CONN
+        int "Maximal STA connections"
+        default 4
+        range 1 10
+        help
+            Max number of stations that can connect to the softAP concurrently.
+
+endmenu

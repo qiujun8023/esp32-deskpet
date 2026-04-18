@@ -35,4 +35,12 @@ idf.py flash monitor
 
 ## 使用
 
-上电后手机连接 WiFi **`ESP32-DeskPet`**（无密码），浏览器访问 `10.10.10.10` 打开控制页面。
+上电后手机连接 WiFi **`ESP32-DeskPet`**（无密码），系统通常会自动弹出 captive portal 控制页。若未弹出，浏览器手动访问 `192.168.4.1` 即可。
+
+## 配置
+
+可选参数通过 `idf.py menuconfig` → *DeskPet Configuration* 调整:
+
+- `ESP_WIFI_SSID` — 热点名（默认 `ESP32-DeskPet`）
+- `ESP_WIFI_PASSWORD` — 热点密码（默认空 = 开放网络）
+- `ESP_MAX_STA_CONN` — 最大同时连接数（默认 4）

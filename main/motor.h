@@ -1,4 +1,5 @@
 #pragma once
+#include <stdatomic.h>
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -12,12 +13,11 @@ typedef enum {
 
 void motor_init(void);
 
-/* 差速驱动：left/right 范围 -255 ~ 255
-   正值 = 向前，负值 = 向后，0 = 停止 */
+/* 差速驱动,left/right 取值 -255~255,正值前进,负值后退 */
 void motor_set(int left, int right);
 
-/* 简单指令（固定速度，供自主运动使用）*/
 void motor_exec(motor_cmd_t cmd);
 void motor_exec_timed(motor_cmd_t cmd, uint32_t duration_ms);
 
-extern volatile bool g_manual_lock;
+/* 手动控制期间由 HTTP 层置位,抑制自主运动任务抢控 */
+extern atomic_bool motor_manual_lock;

@@ -1,10 +1,10 @@
 #pragma once
+#include <stdatomic.h>
 #include <stdbool.h>
 
-#include "display/robo_eyes.h"
+#include "display/robot_eyes.h"
 
-/* 全局自主运动模式（0=睡眠 1=摆动 2=好奇）*/
-extern volatile int g_auto_mode;
+/* 数值与 eye_mode_t 对齐,供 auto_move 任务和眼睛引擎共享 */
+extern atomic_int robot_state_auto_mode;
 
-/* 切换运动模式（同步更新眼睛动画引擎）*/
-void set_auto_mode(int mode);
+void robot_state_set_auto_mode(int mode);

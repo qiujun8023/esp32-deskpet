@@ -1,19 +1,25 @@
 idf_component_register(
     SRCS
         "main.c"
+        "motor.c"
+        "robot_state.c"
+        "net/wifi_ap.c"
+        "net/captive_dns.c"
+        "net/http_server.c"
         "display/ssd1306.c"
         "display/draw.c"
-        "display/robo_eyes.c"
-        "motor.c"
-        "wifi_ws.c"
+        "display/robot_eyes.c"
     INCLUDE_DIRS "."
-    REQUIRES
+    PRIV_REQUIRES
         driver
         esp_wifi
         esp_netif
-        esp_http_server
         esp_event
+        esp_http_server
         esp_timer
+        json
         nvs_flash
         lwip
+    EMBED_FILES
+        "net/index.html"
 )

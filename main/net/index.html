@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>桌面机器人</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0a0e1a;color:#00ffe1;font-family:Arial,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:20px;padding:16px}
+h2{font-size:1.2rem;letter-spacing:3px;text-shadow:0 0 12px #00ffe1}
+#joystick-area{position:relative;width:180px;height:180px;border-radius:50%;border:2px solid rgba(0,255,225,0.4);background:rgba(0,255,225,0.05);touch-action:none}
+#stick{position:absolute;width:60px;height:60px;border-radius:50%;background:radial-gradient(circle,#00ffe1,#00b3a4);box-shadow:0 0 16px #00ffe1;top:60px;left:60px;pointer-events:none}
+.btn-row{display:flex;gap:10px}
+.btn{border:none;border-radius:12px;padding:10px 18px;font-size:1rem;font-weight:bold;cursor:pointer;background:linear-gradient(145deg,#0ff,#00b3a4);color:#000;opacity:.7;transition:.15s}
+.btn.active,.btn:active{opacity:1;box-shadow:0 0 14px #00ffe1}
+.mood-row{display:flex;gap:10px;font-size:1.4rem}
+.mood-btn{background:none;border:2px solid rgba(0,255,225,.3);border-radius:10px;padding:8px 14px;font-size:1.4rem;cursor:pointer;transition:.15s}
+.mood-btn.active{border-color:#00ffe1;background:rgba(0,255,225,.15);box-shadow:0 0 10px #00ffe1}
+#status{font-size:.75rem;opacity:.5;letter-spacing:1px}
+</style>
+</head>
+<body>
+<h2>桌面机器人</h2>
+<div id="joystick-area"><div id="stick"></div></div>
+<div class="btn-row">
+<button class="btn" id="m0" onclick="setMode(0)">睡眠</button>
+<button class="btn" id="m1" onclick="setMode(1)">摆动</button>
+<button class="btn active" id="m2" onclick="setMode(2)">好奇</button>
+</div>
+<div class="mood-row">
+<button class="mood-btn active" id="e0" onclick="setEmo('default')">😐</button>
+<button class="mood-btn" id="e1" onclick="setEmo('happy')">😄</button>
+<button class="mood-btn" id="e2" onclick="setEmo('angry')">😡</button>
+<button class="mood-btn" id="e3" onclick="setEmo('tired')">😴</button>
+</div>
+<div id="status">连接中...</div>
+<script>
+var ws,joy=document.getElementById('joystick-area'),stick=document.getElementById('stick'),area=joy.getBoundingClientRect(),R=90,r=30,dragging=false,ox=0,oy=0;
+
+function connect(){
+  ws=new WebSocket('ws://'+location.host+'/ws');
+  ws.onopen=function(){document.getElementById('status').textContent='已连接';};
+  ws.onclose=function(){document.getElementById('status').textContent='已断开，重连中...';setTimeout(connect,2000);};
+  ws.onerror=function(){ws.close();};
+}
+connect();
+
+function send(obj){
+  if(ws&&ws.readyState===1)ws.send(JSON.stringify(obj));
+}
+
+function moveTo(x,y){
+  var d=Math.sqrt(x*x+y*y);
+  if(d>R-r){x=x/d*(R-r);y=y/d*(R-r);}
+  stick.style.left=(R-r+x)+'px';
+  stick.style.top=(R-r+y)+'px';
+  send({j:[x/(R-r),y/(R-r)]});
+}
+
+function resetStick(){
+  stick.style.left=(R-r)+'px';
+  stick.style.top=(R-r)+'px';
+  send({j:[0,0]});
+}
+
+joy.addEventListener('touchstart',function(e){
+  e.preventDefault();dragging=true;
+  area=joy.getBoundingClientRect();
+  ox=area.left+R;oy=area.top+R;
+},{passive:false});
+
+joy.addEventListener('touchmove',function(e){
+  e.preventDefault();
+  if(!dragging)return;
+  var t=e.touches[0];
+  moveTo(t.clientX-ox,t.clientY-oy);
+},{passive:false});
+
+joy.addEventListener('touchend',function(e){
+  e.preventDefault();dragging=false;resetStick();
+},{passive:false});
+
+joy.addEventListener('mousedown',function(e){
+  dragging=true;
+  area=joy.getBoundingClientRect();
+  ox=area.left+R;oy=area.top+R;
+  moveTo(e.clientX-ox,e.clientY-oy);
+});
+window.addEventListener('mousemove',function(e){if(dragging)moveTo(e.clientX-ox,e.clientY-oy);});
+window.addEventListener('mouseup',function(){if(dragging){dragging=false;resetStick();}});
+
+var curMode=2;
+function setMode(m){
+  curMode=m;
+  for(var i=0;i<3;i++)document.getElementById('m'+i).classList.toggle('active',i===m);
+  send({m:['off','soft','normal'][m]});
+}
+
+var emos=['default','happy','angry','tired'];
+var curEmo=0;
+function setEmo(e){
+  var idx=emos.indexOf(e);curEmo=idx>=0?idx:0;
+  for(var i=0;i<4;i++)document.getElementById('e'+i).classList.toggle('active',i===curEmo);
+  send({e:e});
+}
+</script>
+</body>
+</html>
