@@ -39,7 +39,7 @@ static eye_t          s_eye_l, s_eye_r;
 static _Atomic mood_t s_mood = MOOD_DEFAULT;
 static _Atomic eye_mode_t s_mode = EYE_MODE_NORMAL;
 
-// 0=张开等待 1=闭合中 2=张开中
+// 0=张开等待，1=闭合中，2=张开中
 static int     s_blink_state   = 0;
 static int64_t s_blink_next_us = 0;
 
@@ -103,7 +103,7 @@ void robot_eyes_update(void) {
             trigger_blink();
         }
     } else if (s_blink_state == 1) {
-        // 插值渐近,不等严格归零,否则下一步目标切回默认高度会让闭合动画卡住
+        // 插值渐近，不等严格归零，否则下一步目标切回默认高度会让闭合动画卡住
         if (s_eye_l.ch < 3.0f) {
             s_eye_l.th    = EYE_H_DEF;
             s_eye_r.th    = EYE_H_DEF;
@@ -129,7 +129,7 @@ void robot_eyes_update(void) {
         s_eye_r.ty = EYE_Y_DEF;
     }
 
-    // 睡眠模式用慢插值,视觉上更像放松游离
+    // 睡眠模式用慢插值，视觉上更像放松游离
     float sp   = (mode == EYE_MODE_SLEEP) ? LERP_SLOW : LERP_FAST;
     s_eye_l.cx = lerpf(s_eye_l.cx, s_eye_l.tx, sp);
     s_eye_l.cy = lerpf(s_eye_l.cy, s_eye_l.ty, sp);
@@ -155,29 +155,29 @@ void robot_eyes_update(void) {
 
     int lx = (int)s_eye_l.cx;
     int rx = (int)s_eye_r.cx;
-    // 高度变化时 y 反向补偿,让眨眼看起来是上下眼皮同时向中线收拢
+    // 高度变化时 y 反向补偿，让眨眼看起来是上下眼皮同时向中线收拢
     int ly = (int)(s_eye_l.cy + (EYE_H_DEF - lh_i) / 2.0f);
     int ry = (int)(s_eye_r.cy + (EYE_H_DEF - rh_i) / 2.0f);
 
     draw_fill_round_rect(lx, ly, EYE_W_DEF, lh_i, EYE_R_DEF, 1);
     draw_fill_round_rect(rx, ry, EYE_W_DEF, rh_i, EYE_R_DEF, 1);
 
-    // 眨眼过程中跳过情绪遮罩,避免两层动画叠加出现闪烁
+    // 眨眼过程中跳过情绪遮罩，避免两层动画叠加出现闪烁
     if (s_blink_state == 0 && lh_i >= EYE_H_DEF - 3) {
         int lid = lh_i / 2;
         switch (mood) {
             case MOOD_TIRED:
-                // 左右对称的外高内低三角,模拟眼皮下垂
+                // 左右对称的外高内低三角，模拟眼皮下垂
                 draw_fill_triangle(lx, ly - 1, lx + EYE_W_DEF, ly - 1, lx, ly + lid - 1, 0);
                 draw_fill_triangle(rx, ry - 1, rx + EYE_W_DEF, ry - 1, rx + EYE_W_DEF, ry + lid - 1, 0);
                 break;
             case MOOD_ANGRY:
-                // 与 tired 三角方向相反,形成眉头内收
+                // 与 tired 三角方向相反，形成眉头内收
                 draw_fill_triangle(lx, ly - 1, lx + EYE_W_DEF, ly - 1, lx + EYE_W_DEF, ly + lid - 1, 0);
                 draw_fill_triangle(rx, ry - 1, rx + EYE_W_DEF, ry - 1, rx, ry + lid - 1, 0);
                 break;
             case MOOD_HAPPY:
-                // 用大圆角矩形在下半部做"擦除",保留顶部弧线成笑眼
+                // 用大圆角矩形在下半部做"擦除"，保留顶部弧线成笑眼
                 draw_fill_round_rect(lx - 1, ly + lh_i - lid + 1, EYE_W_DEF + 2, EYE_H_DEF, EYE_R_DEF, 0);
                 draw_fill_round_rect(rx - 1, ry + rh_i - lid + 1, EYE_W_DEF + 2, EYE_H_DEF, EYE_R_DEF, 0);
                 break;

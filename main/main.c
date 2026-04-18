@@ -33,7 +33,7 @@ static void task_auto_move(void* arg) {
             continue;
         }
 
-        /* 25ms tick 下按概率触发:SOFT 约 5s 一次,NORMAL 约 2s 一次 */
+        /* 25 ms tick 下按概率触发：SOFT 约 5 s 一次，NORMAL 约 2 s 一次 */
         uint32_t prob = (mode == EYE_MODE_SOFT) ? 125 : 50;
         if ((esp_random() % prob) == 0) {
             int idx = esp_random() % ncmds;

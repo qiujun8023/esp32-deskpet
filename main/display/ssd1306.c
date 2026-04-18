@@ -14,7 +14,7 @@ static const char*             TAG = "ssd1306";
 static i2c_master_bus_handle_t s_bus;
 static i2c_master_dev_handle_t s_dev;
 
-/* SSD1306 上电初始化序列,数值按数据手册 §7.4 默认值裁剪,次序敏感勿重排 */
+/* SSD1306 上电初始化序列，数值按数据手册 §7.4 默认值裁剪，次序敏感勿重排 */
 static const uint8_t s_init_cmds[] = {
     0xAE,
     0xD5, 0x80,
@@ -35,7 +35,7 @@ static const uint8_t s_init_cmds[] = {
 };
 
 static void write_cmd(uint8_t cmd) {
-    // 控制字节 0x00:Co=0,D/C=0 表示随后单字节是命令
+    // 控制字节 0x00：Co=0，D/C=0 表示随后单字节是命令
     uint8_t   buf[2] = {0x00, cmd};
     esp_err_t err    = i2c_master_transmit(s_dev, buf, 2, 100);
     if (err != ESP_OK) {
@@ -81,7 +81,7 @@ void ssd1306_flush(const uint8_t* buf) {
     write_cmd(0);
     write_cmd(7);
 
-    // 控制字节 0x40 + 1024 字节一次发完,比分页传输快一个数量级
+    // 控制字节 0x40 + 1024 字节一次发完，比分页传输快一个数量级
     static uint8_t s_tx[SSD1306_BUFSIZE + 1];
     s_tx[0] = 0x40;
     memcpy(s_tx + 1, buf, SSD1306_BUFSIZE);

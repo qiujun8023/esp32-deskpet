@@ -1,5 +1,6 @@
 #include "net/http_server.h"
 
+#include <math.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
@@ -83,12 +84,12 @@ static void parse_joystick(const cJSON* arr) {
 
     atomic_store(&motor_manual_lock, true);
 
-    // 差速驱动:前推(jy<0) 时两轮同速前进,横向 jx 形成左右差值,再按最大绝对值归一化
+    // 差速驱动：前推（jy<0）时两轮同速前进，横向 jx 形成左右差值，再按最大绝对值归一化
     float fl   = -jy + jx;
     float fr   = -jy - jx;
-    float maxv = fl < 0 ? -fl : fl;
-    if ((fr < 0 ? -fr : fr) > maxv)
-        maxv = fr < 0 ? -fr : fr;
+    float maxv = fabsf(fl);
+    if (fabsf(fr) > maxv)
+        maxv = fabsf(fr);
     if (maxv > 1.0f) {
         fl /= maxv;
         fr /= maxv;

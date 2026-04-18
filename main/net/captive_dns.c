@@ -81,7 +81,7 @@ static void dns_task(void* arg) {
         resp[DNS_ANCOUNT_LO] = DNS_ANSWER_COUNT;
 
         int p = n;
-        // NAME 用指针压缩 0xC00C 指回 header 后的问题名,比复制一遍短
+        // NAME 用指针压缩 0xC00C 指回 header 后的问题名，比复制一遍短
         resp[p++] = 0xC0;
         resp[p++] = 0x0C;
         // TYPE=A

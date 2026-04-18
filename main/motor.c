@@ -128,8 +128,13 @@ void motor_exec(motor_cmd_t cmd) {
 }
 
 void motor_exec_timed(motor_cmd_t cmd, uint32_t duration_ms) {
-    if (s_stop_timer)
-        esp_timer_stop(s_stop_timer);
+    if (s_stop_timer) {
+        esp_err_t ret = esp_timer_stop(s_stop_timer);
+        /* ESP_ERR_INVALID_STATE 表示定时器本来就没在跑，属正常情况 */
+        if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE) {
+            ESP_LOGW(TAG, "stop timer failed: %s", esp_err_to_name(ret));
+        }
+    }
     motor_exec(cmd);
     if (duration_ms > 0 && s_stop_timer) {
         esp_timer_start_once(s_stop_timer, (uint64_t)duration_ms * 1000ULL);

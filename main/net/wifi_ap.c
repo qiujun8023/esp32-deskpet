@@ -22,7 +22,7 @@ static void wifi_event_handler(void* arg, esp_event_base_t base, int32_t id, voi
     } else if (id == WIFI_EVENT_AP_STADISCONNECTED) {
         wifi_event_ap_stadisconnected_t* e = (wifi_event_ap_stadisconnected_t*)data;
         ESP_LOGW(TAG, "sta disconnected, mac=" MACSTR ", releasing manual lock", MAC2STR(e->mac));
-        // 浏览器关闭时未松手,manual_lock 会卡住让自主模式无法接管,顺手清掉
+        // 浏览器关闭时未松手，manual_lock 会卡住让自主模式无法接管，顺手清掉
         atomic_store(&motor_manual_lock, false);
         motor_set(0, 0);
     }
@@ -31,7 +31,7 @@ static void wifi_event_handler(void* arg, esp_event_base_t base, int32_t id, voi
 static void configure_dhcps_captive(esp_netif_t* ap_netif) {
     esp_netif_dhcps_stop(ap_netif);
 
-    // 把 AP 自身声明为客户端主 DNS,captive_dns 才能截获域名查询
+    // 把 AP 自身声明为客户端主 DNS，captive_dns 才能截获域名查询
     esp_netif_dns_info_t dns = {.ip.type = ESP_IPADDR_TYPE_V4};
     IP4_ADDR(&dns.ip.u_addr.ip4, 192, 168, 4, 1);
     esp_netif_set_dns_info(ap_netif, ESP_NETIF_DNS_MAIN, &dns);
